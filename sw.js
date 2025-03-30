@@ -8,7 +8,7 @@ self.addEventListener("install", (event) => {
       return cache.addAll([
         "/", // Home page
         "/p/latest-jobs.html",
-        "/p/admit-cards.html",
+        "/p/answer-key.html",
         "/p/results.html",
       ]);
     })
