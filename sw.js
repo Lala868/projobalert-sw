@@ -1,18 +1,24 @@
 const CACHE_NAME = "blog-cache-v1";
 const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 din
 
-// Install event - Automatically cache first-visit pages & assets
+// ✅ Pre-cache important pages
+const urlsToCache = [
+  "/", // Home page
+  "/p/latest-jobs.html",
+  "/p/admit-cards.html",
+  "/p/results.html",
+];
+
+// Install event - Automatically cache important pages
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        "/", // Home page
-      ]);
+      return cache.addAll(urlsToCache);
     })
   );
 });
 
-// Fetch event - Serve from cache first, else fetch from network
+// Fetch event - Serve from cache first, then fetch & update cache
 self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(event.request).then((response) => {
@@ -26,7 +32,7 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Purane cache delete karne ka system (30 din ke baad automatic refresh)
+// ✅ Purane cache delete karne ka system (30 din ke baad automatic refresh)
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
