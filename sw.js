@@ -1,37 +1,42 @@
-const CACHE_NAME = "blog-cache-v1"; 
+const CACHE_NAME = "blog-cache-v1";
 const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 din
 
-// Install event - Cache important pages
+// Install event - Service Worker Install hone par trigger hoga
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll([
         "/", // Home page
-        "/p/latest-jobs.html",
-        "/p/answer-key.html",
-        "/p/results.html",
       ]);
     })
   );
 });
 
-// Fetch event - Cache-first, but background update from network
+// Fetch event - Sabhi pages ko cache karo aur fast loading ensure karo
 self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(event.request).then((response) => {
-      let fetchRequest = fetch(event.request).then((fetchResponse) => {
+      if (response) {
+        // Agar cache me hai to wahi return karo
+        return response;
+      }
+      return fetch(event.request).then((fetchResponse) => {
         return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, fetchResponse.clone()); // Update cache
+          // Sirf GET requests ko cache me daalo (POST ya API calls nahi cache honi chahiye)
+          if (event.request.method === "GET") {
+            cache.put(event.request, fetchResponse.clone());
+          }
           return fetchResponse;
         });
       });
-
-      return response || fetchRequest; // Cache-first, but update in background
+    }).catch(() => {
+      // Agar network down ho to cache se load karne ka try karo
+      return caches.match("/");
     })
   );
 });
 
-// Purane cache delete karne ka system (30 din ke baad automatic refresh)
+// Activate event - Purane cache delete karne ka system (30 din ke baad automatic refresh)
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
