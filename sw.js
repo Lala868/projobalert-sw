@@ -1,24 +1,25 @@
 const CACHE_NAME = "blog-cache-v1";
-const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 din
+const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-// ✅ Pre-cache important pages
-const urlsToCache = [
-  "/", // Home page
+// Important pages ko manually pre-cache karenge
+const PRECACHE_URLS = [
+  "/",  
   "/p/latest-jobs.html",
   "/p/admit-cards.html",
   "/p/results.html",
+  "/p/about-us.html"
 ];
 
-// Install event - Automatically cache important pages
+// Install event - Pre-cache important pages
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache);
+      return cache.addAll(PRECACHE_URLS);
     })
   );
 });
 
-// Fetch event - Serve from cache first, then fetch & update cache
+// Fetch event - Sabhi pages ko cache me dalna
 self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(event.request).then((response) => {
@@ -32,7 +33,7 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// ✅ Purane cache delete karne ka system (30 din ke baad automatic refresh)
+// Activate event - Purana cache delete karna (30 din ke baad automatic refresh)
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
