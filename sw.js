@@ -1,47 +1,38 @@
 const CACHE_NAME = "blog-cache-v1";
-const urlsToCache = [
-  "/", 
-  "/p/latest-jobs.html", 
-  "/p/admit-cards.html", 
-  "/p/results.html", 
-  "https://projobalert01.blogspot.com/script.js", 
-  "https://projobalert01.blogspot.com/extra-script.js"
-];
+const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 din
 
+// Install event - Automatically cache first-visit pages & assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache);
+      return cache.addAll([
+        "/", // Home page
+      ]);
     })
   );
 });
 
-// Fetch event with cache expiration logic
+// Fetch event - Serve from cache first, else fetch from network
 self.addEventListener("fetch", (event) => {
   event.respondWith(
     caches.match(event.request).then((response) => {
-      if (response) {
-        // Cache expiry logic: 30 days
-        return response;
-      }
-      return fetch(event.request).then((newResponse) => {
+      return response || fetch(event.request).then((fetchResponse) => {
         return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, newResponse.clone());
-          return newResponse;
+          cache.put(event.request, fetchResponse.clone());
+          return fetchResponse;
         });
       });
     })
   );
 });
 
-// Purane cache delete karne ka system (Expiration logic)
+// Purane cache delete karne ka system (30 din ke baad automatic refresh)
 self.addEventListener("activate", (event) => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (!cacheWhitelist.includes(cacheName)) {
+          if (cacheName !== CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })
