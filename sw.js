@@ -1,52 +1,43 @@
-const CACHE_NAME = 'projobalert-cache-v1';
+const CACHE_NAME = 'projobalert-cache-v2';
 const CACHE_URLS = [
-    '/', 
-    '/index.html', 
-    '/about.html', 
-    '/assets/styles.css', 
-    '/assets/scripts.js', 
-    '/assets/images/logo.png', 
-    '/assets/images/background.jpg', 
-    '/favicon.ico', 
-    '/offline.html' // Offline fallback
+    '/', '/index.html', '/about.html', 
+    '/assets/styles.css', '/assets/scripts.js', 
+    '/assets/images/logo.png', '/assets/images/background.jpg',
+    '/favicon.ico', '/offline.html'
 ];
 
-// Install: Pre-cache essential resources
+// Install: Pre-cache resources
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then(async (cache) => {
             try {
                 await cache.addAll(CACHE_URLS);
             } catch (error) {
-                console.error('Failed to pre-cache resources:', error);
+                console.error('Failed to pre-cache:', error);
             }
         })
     );
 });
 
-// Fetch: Try Cache First, then Network
+// Fetch: Serve from cache first, update in background
 self.addEventListener('fetch', (event) => {
     event.respondWith(
-        caches.match(event.request).then((cachedResponse) => {
-            if (cachedResponse) {
-                return cachedResponse; // Serve from cache
-            }
-            return fetch(event.request)
-                .then((networkResponse) => {
+        caches.open(CACHE_NAME).then((cache) => {
+            return cache.match(event.request).then((cachedResponse) => {
+                const fetchPromise = fetch(event.request).then((networkResponse) => {
                     if (networkResponse && networkResponse.status === 200) {
-                        let responseClone = networkResponse.clone();
-                        caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(event.request, responseClone);
-                        });
+                        cache.put(event.request, networkResponse.clone());
                     }
                     return networkResponse;
-                })
-                .catch(() => caches.match('/offline.html')); // Offline fallback
+                }).catch(() => cachedResponse || caches.match('/offline.html'));
+
+                return cachedResponse || fetchPromise;
+            });
         })
     );
 });
 
-// Activate: Remove old caches & update
+// Activate: Remove old caches
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
