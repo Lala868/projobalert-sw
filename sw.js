@@ -1,12 +1,11 @@
-const CACHE_NAME = "blog-cache-v4";
-const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // ⏳ 30 din
+const CACHE_NAME = "blog-cache-v5";
 const STATIC_ASSETS = [
   "/", // Home page
-  "/offline.html", // Offline fallback
+  "/offline.html", // Offline fallback page
   "/css/style.css", // CSS
   "/js/script.js", // JavaScript
   "/images/logo.png", // Logo
-  "/fonts/custom-font.woff2", // Fonts (Agar hain)
+  "/fonts/custom-font.woff2", // Fonts
 ];
 
 // ✅ Install Event - Static Files Cache Karo
@@ -16,12 +15,12 @@ self.addEventListener("install", (event) => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  self.skipWaiting(); // ⚡ Immediate Activation
+  self.skipWaiting();
 });
 
-// ✅ Smart Fetch Event (Fresh Content for Posts & Labels)
+// ✅ Smart Fetch Event (Posts & Labels Cached + Background Refresh)
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return; // ❌ POST requests cache nahi honi chahiye
+  if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
 
@@ -30,15 +29,14 @@ self.addEventListener("fetch", (event) => {
       return cache.match(event.request).then((cachedResponse) => {
         const fetchPromise = fetch(event.request)
           .then((networkResponse) => {
-            // ✅ Agar post ya label page hai toh cache update karo
+            // ✅ Agar post ya label page hai, to cache update karo
             if (url.pathname.includes("/search/label/") || url.pathname.includes("/p/") || url.pathname.includes("/post-")) {
               cache.put(event.request, networkResponse.clone());
             }
             return networkResponse;
           })
-          .catch(() => cachedResponse || caches.match("/offline.html")); // ❌ Offline Mode
+          .catch(() => cachedResponse || caches.match("/offline.html")); // Offline Mode
 
-        // ✅ Static assets fast serve karo, baaki fresh fetch ho
         return cachedResponse || fetchPromise;
       });
     })
