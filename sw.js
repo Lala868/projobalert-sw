@@ -1,59 +1,62 @@
 const CACHE_NAME = 'projobalert-cache-v1';
 const CACHE_URLS = [
-    '/', // Home page
-    '/index.html', // Main HTML file
-    '/about.html', // About page (optional)
-    '/assets/styles.css', // CSS file
-    '/assets/scripts.js', // JavaScript file
-    '/assets/images/logo.png', // Logo image
-    '/assets/images/background.jpg', // Background image
-    '/favicon.ico', // Favicon
+    '/', 
+    '/index.html', 
+    '/about.html', 
+    '/assets/styles.css', 
+    '/assets/scripts.js', 
+    '/assets/images/logo.png', 
+    '/assets/images/background.jpg', 
+    '/favicon.ico', 
+    '/offline.html' // Offline fallback
 ];
 
-// Install the service worker and cache essential files
+// Install: Pre-cache essential resources
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(CACHE_URLS); // Pre-cache essential resources
+        caches.open(CACHE_NAME).then(async (cache) => {
+            try {
+                await cache.addAll(CACHE_URLS);
+            } catch (error) {
+                console.error('Failed to pre-cache resources:', error);
+            }
         })
     );
 });
 
-// Fetch event to serve cached resources
+// Fetch: Try Cache First, then Network
 self.addEventListener('fetch', (event) => {
     event.respondWith(
         caches.match(event.request).then((cachedResponse) => {
             if (cachedResponse) {
-                // If cache is found, serve it
-                return cachedResponse;
+                return cachedResponse; // Serve from cache
             }
-            // If not found in cache, fetch from network and update cache
-            return fetch(event.request).then((networkResponse) => {
-                if (networkResponse && networkResponse.status === 200) {
-                    // Update cache with new response
-                    caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(event.request, networkResponse.clone());
-                    });
-                }
-                return networkResponse;
-            });
+            return fetch(event.request)
+                .then((networkResponse) => {
+                    if (networkResponse && networkResponse.status === 200) {
+                        let responseClone = networkResponse.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(event.request, responseClone);
+                        });
+                    }
+                    return networkResponse;
+                })
+                .catch(() => caches.match('/offline.html')); // Offline fallback
         })
     );
 });
 
-// Activate the service worker and clear old caches
+// Activate: Remove old caches & update
 self.addEventListener('activate', (event) => {
-    const cacheWhitelist = [CACHE_NAME];
     event.waitUntil(
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
-                    if (!cacheWhitelist.includes(cacheName)) {
-                        // Delete old caches that are no longer needed
+                    if (cacheName !== CACHE_NAME) {
                         return caches.delete(cacheName);
                     }
                 })
             );
-        })
+        }).then(() => self.clients.claim())
     );
 });
