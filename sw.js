@@ -1,37 +1,59 @@
-const CACHE_NAME = "blog-cache-v8";
-const STATIC_ASSETS = [
-  "https://yourblog.blogspot.com/", 
-  "https://yourblog.blogspot.com/offline.html", 
-  "https://yourblog.blogspot.com/css/style.css", 
-  "https://yourblog.blogspot.com/js/script.js", 
-  "https://yourblog.blogspot.com/images/logo.png"
+const CACHE_NAME = 'projobalert-cache-v1';
+const CACHE_URLS = [
+    '/', // Home page
+    '/index.html', // Main HTML file
+    '/about.html', // About page (optional)
+    '/assets/styles.css', // CSS file
+    '/assets/scripts.js', // JavaScript file
+    '/assets/images/logo.png', // Logo image
+    '/assets/images/background.jpg', // Background image
+    '/favicon.ico', // Favicon
 ];
 
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-
-  const url = new URL(event.request.url);
-  const isStaticAsset = STATIC_ASSETS.some(asset => url.pathname.includes(asset));
-
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse && isStaticAsset) {
-        return cachedResponse;
-      }
-
-      return fetch(event.request)
-        .then((networkResponse) => {
-          if (!networkResponse || networkResponse.status !== 200) {
-            throw new Error("Fetch Failed");
-          }
-          return caches.open(CACHE_NAME).then((cache) => {
-            if (url.pathname.startsWith("/search/label/") || url.pathname.startsWith("/post/")) {
-              cache.put(event.request, networkResponse.clone()); // 🆕 Dynamic Cache for Posts
-            }
-            return networkResponse;
-          });
+// Install the service worker and cache essential files
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll(CACHE_URLS); // Pre-cache essential resources
         })
-        .catch(() => caches.match("/offline.html"));
-    })
-  );
+    );
+});
+
+// Fetch event to serve cached resources
+self.addEventListener('fetch', (event) => {
+    event.respondWith(
+        caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) {
+                // If cache is found, serve it
+                return cachedResponse;
+            }
+            // If not found in cache, fetch from network and update cache
+            return fetch(event.request).then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
+                    // Update cache with new response
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, networkResponse.clone());
+                    });
+                }
+                return networkResponse;
+            });
+        })
+    );
+});
+
+// Activate the service worker and clear old caches
+self.addEventListener('activate', (event) => {
+    const cacheWhitelist = [CACHE_NAME];
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    if (!cacheWhitelist.includes(cacheName)) {
+                        // Delete old caches that are no longer needed
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        })
+    );
 });
