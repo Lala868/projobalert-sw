@@ -1,4 +1,4 @@
-const CACHE_NAME = "blog-cache-v7";
+const CACHE_NAME = "blog-cache-v8";
 const STATIC_ASSETS = [
   "/", // Home Page
   "/offline.html", // Offline Fallback
@@ -8,31 +8,37 @@ const STATIC_ASSETS = [
   "/fonts/custom-font.woff2", // Fonts
 ];
 
-// ✅ Install Event - Static Files Cache Karo
+// ✅ Install Event - Static Assets Ko Cache Karo
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
   );
-  self.skipWaiting(); // ⚡ Force Activate Immediately
+  self.skipWaiting();
 });
 
-// ✅ Fetch Event - Serve Cache First, Then Update in Background
+// ✅ Fetch Event - **Cache First for Static Files, Fresh Fetch for Posts & Labels**
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  const url = new URL(event.request.url);
+  const isStaticAsset = STATIC_ASSETS.includes(url.pathname);
+
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      const networkFetch = fetch(event.request)
+      if (cachedResponse && isStaticAsset) {
+        // ⚡ **Static Files Ke Liye Direct Cache Se Serve Karo**
+        return cachedResponse;
+      }
+
+      // 🆕 **Baaki Ke Liye Fresh Fetch + Background Cache Update**
+      return fetch(event.request)
         .then((networkResponse) => {
           return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse.clone()); // Update Cache
+            cache.put(event.request, networkResponse.clone());
             return networkResponse;
           });
         })
-        .catch(() => cachedResponse || caches.match("/offline.html")); // Offline Mode
-
-      return cachedResponse || networkFetch;
+        .catch(() => cachedResponse || caches.match("/offline.html")); // ❌ Offline Mode
     })
   );
 });
@@ -50,5 +56,5 @@ self.addEventListener("activate", (event) => {
       );
     })
   );
-  self.clients.claim(); // Ensure New SW Takes Control
+  self.clients.claim();
 });
