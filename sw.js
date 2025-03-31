@@ -1,4 +1,4 @@
-const CACHE_NAME = "blog-cache-v3";
+const CACHE_NAME = "blog-cache-v4";
 const CACHE_DURATION = 30 * 24 * 60 * 60 * 1000; // ⏳ 30 din
 const STATIC_ASSETS = [
   "/", // Home page
@@ -9,7 +9,7 @@ const STATIC_ASSETS = [
   "/fonts/custom-font.woff2", // Fonts (Agar hain)
 ];
 
-// ✅ Install Event - Static Files Cache Me Save Karo
+// ✅ Install Event - Static Files Cache Karo
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -19,17 +19,27 @@ self.addEventListener("install", (event) => {
   self.skipWaiting(); // ⚡ Immediate Activation
 });
 
-// ✅ Fetch Event - Smart Caching Strategy with 30 Days Expiry
+// ✅ Smart Fetch Event (Fresh Content for Posts & Labels)
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return; // ❌ POST requests cache nahi honi chahiye
+
+  const url = new URL(event.request.url);
 
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.match(event.request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse; // ⚡ Cache se fast load
-        }
-        return fetchAndUpdateCache(event.request, cache);
+        const fetchPromise = fetch(event.request)
+          .then((networkResponse) => {
+            // ✅ Agar post ya label page hai toh cache update karo
+            if (url.pathname.includes("/search/label/") || url.pathname.includes("/p/") || url.pathname.includes("/post-")) {
+              cache.put(event.request, networkResponse.clone());
+            }
+            return networkResponse;
+          })
+          .catch(() => cachedResponse || caches.match("/offline.html")); // ❌ Offline Mode
+
+        // ✅ Static assets fast serve karo, baaki fresh fetch ho
+        return cachedResponse || fetchPromise;
       });
     })
   );
@@ -50,19 +60,3 @@ self.addEventListener("activate", (event) => {
   );
   self.clients.claim();
 });
-
-// ✅ 30 Din Baad Cache Refresh Karega
-function fetchAndUpdateCache(request, cache) {
-  return fetch(request).then((response) => {
-    if (!response || response.status !== 200 || response.type !== "basic") {
-      return response;
-    }
-    
-    const clonedResponse = response.clone();
-    const headers = new Headers(clonedResponse.headers);
-    headers.append("sw-fetch-time", new Date().toISOString()); // ✅ Cache me fetch time store karo
-    cache.put(request, clonedResponse);
-    
-    return response;
-  });
-}
