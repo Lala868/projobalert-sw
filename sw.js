@@ -1,60 +1,37 @@
 const CACHE_NAME = "blog-cache-v8";
 const STATIC_ASSETS = [
-  "/", // Home Page
-  "/offline.html", // Offline Fallback
-  "/css/style.css", // CSS
-  "/js/script.js", // JavaScript
-  "/images/logo.png", // Logo
-  "/fonts/custom-font.woff2", // Fonts
+  "https://yourblog.blogspot.com/", 
+  "https://yourblog.blogspot.com/offline.html", 
+  "https://yourblog.blogspot.com/css/style.css", 
+  "https://yourblog.blogspot.com/js/script.js", 
+  "https://yourblog.blogspot.com/images/logo.png"
 ];
 
-// ✅ Install Event - Static Assets Ko Cache Karo
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
-  self.skipWaiting();
-});
-
-// ✅ Fetch Event - **Cache First for Static Files, Fresh Fetch for Posts & Labels**
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
-  const isStaticAsset = STATIC_ASSETS.includes(url.pathname);
+  const isStaticAsset = STATIC_ASSETS.some(asset => url.pathname.includes(asset));
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse && isStaticAsset) {
-        // ⚡ **Static Files Ke Liye Direct Cache Se Serve Karo**
         return cachedResponse;
       }
 
-      // 🆕 **Baaki Ke Liye Fresh Fetch + Background Cache Update**
       return fetch(event.request)
         .then((networkResponse) => {
+          if (!networkResponse || networkResponse.status !== 200) {
+            throw new Error("Fetch Failed");
+          }
           return caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse.clone());
+            if (url.pathname.startsWith("/search/label/") || url.pathname.startsWith("/post/")) {
+              cache.put(event.request, networkResponse.clone()); // 🆕 Dynamic Cache for Posts
+            }
             return networkResponse;
           });
         })
-        .catch(() => cachedResponse || caches.match("/offline.html")); // ❌ Offline Mode
+        .catch(() => caches.match("/offline.html"));
     })
   );
-});
-
-// ✅ Auto Refresh Cache After 30 Days
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
 });
